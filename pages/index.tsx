@@ -5,6 +5,9 @@ import {
   Heading,
   IconButton,
   Slide,
+  SlideFade,
+  Spinner,
+  Text,
   Tooltip,
   useDisclosure,
   useOutsideClick,
@@ -960,8 +963,15 @@ export const Graph = function (props: GraphProps) {
   // ask the LLM endpoint for a name for each community; drawn every frame from
   // a ref so names appearing incrementally don't re-render the graph
   const communityNamesRef = useRef<CommunityNames>({})
+  // progress of the naming run, shown as a floating indicator; null = idle
+  const [namingStatus, setNamingStatus] = useState<{
+    done: number
+    total: number
+    latest: string
+  } | null>(null)
   useEffect(() => {
     communityNamesRef.current = {}
+    setNamingStatus(null)
     if (coloring.method !== 'community') {
       return
     }
@@ -990,7 +1000,7 @@ export const Graph = function (props: GraphProps) {
             .map((id) => (nodeById[id]?.title as string) ?? id),
         ]),
     )
-    return nameCommunities({
+    const cancel = nameCommunities({
       // the Emacs variables org-roam-ui-ollama-path/-model take precedence
       url: variables.ollamaPath || coloring.llmUrl,
       model: variables.ollamaModel || coloring.llmModel,
@@ -998,7 +1008,14 @@ export const Graph = function (props: GraphProps) {
       onName: (community, name) => {
         communityNamesRef.current = { ...communityNamesRef.current, [community]: name }
       },
+      onProgress: (done, total, latest) => {
+        setNamingStatus({ done, total, latest })
+      },
     })
+    return () => {
+      cancel()
+      setNamingStatus(null)
+    }
   }, [
     filteredGraphData,
     coloring.method,
@@ -1007,6 +1024,14 @@ export const Graph = function (props: GraphProps) {
     variables.ollamaPath,
     variables.ollamaModel,
   ])
+
+  // once naming has finished, keep the indicator visible briefly, then hide it
+  useEffect(() => {
+    if (namingStatus && namingStatus.done >= namingStatus.total) {
+      const timeout = setTimeout(() => setNamingStatus(null), 2500)
+      return () => clearTimeout(timeout)
+    }
+  }, [namingStatus])
 
   const [scopedGraphData, setScopedGraphData] = useState<GraphData>({ nodes: [], links: [] })
 
@@ -1469,6 +1494,43 @@ export const Graph = function (props: GraphProps) {
             return null
           }}
         />
+      )}
+      {namingStatus && (
+        <Box
+          position="fixed"
+          bottom={4}
+          left={4}
+          zIndex={1000}
+          pointerEvents="none"
+          bg="blackAlpha.700"
+          color="white"
+          px={4}
+          py={2}
+          borderRadius="md"
+          minWidth="220px"
+        >
+          <Flex alignItems="center">
+            {namingStatus.done >= namingStatus.total ? (
+              <Text mr={2} fontSize="sm">
+                ✓
+              </Text>
+            ) : (
+              <Spinner size="xs" mr={2} speed="0.8s" />
+            )}
+            <Text fontSize="sm">
+              {namingStatus.done >= namingStatus.total
+                ? 'Communities named'
+                : `Naming communities… ${namingStatus.done}/${namingStatus.total}`}
+            </Text>
+          </Flex>
+          {namingStatus.latest && (
+            <SlideFade key={namingStatus.latest} in offsetY="8px">
+              <Text fontSize="xs" fontStyle="italic" opacity={0.85}>
+                {namingStatus.latest}
+              </Text>
+            </SlideFade>
+          )}
+        </Box>
       )}
     </Box>
   )

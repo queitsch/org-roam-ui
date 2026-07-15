@@ -105,18 +105,22 @@ const nameOneCommunity = async (url: string, model: string, titles: string[]): P
 /**
  * Resolve a name for every community in `members`. Cached names are delivered
  * synchronously via `onName`; the rest are fetched from the endpoint with
- * limited concurrency and delivered as they arrive. Returns a cancel function.
+ * limited concurrency and delivered as they arrive. `onProgress` reports how
+ * many uncached communities have been processed so far, so the UI can show
+ * that naming is underway. Returns a cancel function.
  */
 export const nameCommunities = ({
   url,
   model,
   members,
   onName,
+  onProgress,
 }: {
   url: string
   model: string
   members: CommunityMembers
   onName: (community: number, name: string) => void
+  onProgress?: (done: number, total: number, latestName: string) => void
 }): (() => void) => {
   let cancelled = false
   const cache = readCache()
@@ -133,13 +137,17 @@ export const nameCommunities = ({
   })
 
   if (pending.length) {
+    const total = pending.length
+    let done = 0
+    onProgress?.(0, total, '')
     ;(async () => {
       const resolvedModel = await pickModel(url, model)
       const worker = async () => {
         while (pending.length && !cancelled) {
           const job = pending.shift()!
+          let name = ''
           try {
-            const name = await nameOneCommunity(url, resolvedModel, job.titles)
+            name = await nameOneCommunity(url, resolvedModel, job.titles)
             if (name) {
               writeCache(job.signature, name)
               if (!cancelled) {
@@ -149,10 +157,19 @@ export const nameCommunities = ({
           } catch (e) {
             console.error(`Failed to name community ${job.community}:`, e)
           }
+          done += 1
+          if (!cancelled) {
+            onProgress?.(done, total, name)
+          }
         }
       }
       await Promise.all(Array.from({ length: CONCURRENCY }, worker))
-    })().catch((e) => console.error('Community naming failed:', e))
+    })().catch((e) => {
+      console.error('Community naming failed:', e)
+      if (!cancelled) {
+        onProgress?.(total, total, '')
+      }
+    })
   }
 
   return () => {
