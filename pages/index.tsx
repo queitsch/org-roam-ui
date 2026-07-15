@@ -54,6 +54,8 @@ import { usePersistantState } from '../util/persistant-state'
 import { ThemeContext, ThemeContextProps } from '../util/themecontext'
 import { openNodeInEmacs } from '../util/webSocketFunctions'
 import { drawLabels } from '../components/Graph/drawLabels'
+import { drawCommunities } from '../components/Graph/drawCommunities'
+import { CommunityMembers, CommunityNames, nameCommunities } from '../util/communityNames'
 import { VariablesContext } from '../util/variablesContext'
 import { findNthNeighbors } from '../util/findNthNeighbour'
 import { getThemeColor } from '../util/getThemeColor'
@@ -953,6 +955,49 @@ export const Graph = function (props: GraphProps) {
     return { nodes: filteredNodes, links: filteredLinks }
   }, [filter, graphData, coloring.method])
 
+  // ask the LLM endpoint for a name for each community; drawn every frame from
+  // a ref so names appearing incrementally don't re-render the graph
+  const communityNamesRef = useRef<CommunityNames>({})
+  useEffect(() => {
+    communityNamesRef.current = {}
+    if (coloring.method !== 'community') {
+      return
+    }
+    const members: CommunityMembers = {}
+    filteredGraphData.nodes.forEach((nodeArg) => {
+      const node = nodeArg as OrgRoamNode
+      const community = clusterRef.current[node.id as string]
+      if (community === undefined) {
+        return
+      }
+      members[community] = members[community] ?? []
+      members[community].push(node.id as string)
+    })
+    const namedMembers = Object.fromEntries(
+      Object.entries(members)
+        .filter(([, ids]) => ids.length >= coloring.communityMinSize)
+        .map(([community, ids]) => [
+          community,
+          // most connected notes first, they describe the community best
+          ids
+            .sort(
+              (a, b) =>
+                (filteredLinksByNodeIdRef.current[b]?.length ?? 0) -
+                (filteredLinksByNodeIdRef.current[a]?.length ?? 0),
+            )
+            .map((id) => (nodeById[id]?.title as string) ?? id),
+        ]),
+    )
+    return nameCommunities({
+      url: coloring.llmUrl,
+      model: coloring.llmModel,
+      members: namedMembers,
+      onName: (community, name) => {
+        communityNamesRef.current = { ...communityNamesRef.current, [community]: name }
+      },
+    })
+  }, [filteredGraphData, coloring.method, coloring.llmUrl, coloring.llmModel])
+
   const [scopedGraphData, setScopedGraphData] = useState<GraphData>({ nodes: [], links: [] })
 
   useEffect(() => {
@@ -1377,6 +1422,32 @@ export const Graph = function (props: GraphProps) {
         <ForceGraph2D
           ref={graphRef}
           {...graphCommonProps}
+          onRenderFramePre={(ctx, globalScale) => {
+            drawCommunities({
+              ctx,
+              globalScale,
+              nodes: (scope.nodeIds.length ? scopedGraphData : filteredGraphData).nodes,
+              cluster: clusterRef.current,
+              communityNames: communityNamesRef.current,
+              visuals,
+              coloring,
+              theme,
+              layer: 'zones',
+            })
+          }}
+          onRenderFramePost={(ctx, globalScale) => {
+            drawCommunities({
+              ctx,
+              globalScale,
+              nodes: (scope.nodeIds.length ? scopedGraphData : filteredGraphData).nodes,
+              cluster: clusterRef.current,
+              communityNames: communityNamesRef.current,
+              visuals,
+              coloring,
+              theme,
+              layer: 'labels',
+            })
+          }}
           linkLineDash={(link) => {
             const linkArg = link as OrgRoamLink
             if (visuals.citeDashes && linkArg.type?.includes('cite')) {

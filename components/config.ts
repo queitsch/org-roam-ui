@@ -49,6 +49,16 @@ export const initialFilter = {
 }
 export const initialColoring = {
   method: 'degree',
+  // community zones and labels are only drawn when method === 'community'
+  communityZones: true,
+  communityLabels: true,
+  // minimum number of nodes a community needs before it gets a zone and a name
+  communityMinSize: 3,
+  zoneOpacity: 0.075,
+  // OpenAI-compatible endpoint used to name communities (e.g. Ollama)
+  llmUrl: 'http://192.168.1.222:11434/v1',
+  // empty string picks the first chat-capable model the endpoint reports
+  llmModel: '',
 }
 
 export const initialVisuals = {
