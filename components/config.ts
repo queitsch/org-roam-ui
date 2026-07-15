@@ -28,7 +28,7 @@ export const initialPhysics = {
   alphaMin: 0,
   velocityDecay: 0.25,
   gravity: 0.3,
-  gravityOn: true,
+  gravityOn: false,
   gravityLocal: false,
 }
 
@@ -48,7 +48,7 @@ export const initialFilter = {
   noter: true,
 }
 export const initialColoring = {
-  method: 'degree',
+  method: 'community',
   // community zones and labels are only drawn when method === 'community'
   communityZones: true,
   communityLabels: true,

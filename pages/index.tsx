@@ -1496,28 +1496,31 @@ export const Graph = function (props: GraphProps) {
         />
       )}
       {namingStatus && (
+        // explicit colors on purpose: theme tokens get remapped by the Emacs
+        // theme sync, which made the pill unreadable on dark themes
         <Box
           position="fixed"
           bottom={4}
           left={4}
           zIndex={1000}
           pointerEvents="none"
-          bg="blackAlpha.700"
-          color="white"
+          background="rgba(10, 12, 18, 0.92)"
+          border="1px solid rgba(255, 255, 255, 0.25)"
+          boxShadow="0 4px 16px rgba(0, 0, 0, 0.6)"
           px={4}
           py={2}
-          borderRadius="md"
-          minWidth="220px"
+          borderRadius="lg"
+          minWidth="230px"
         >
           <Flex alignItems="center">
             {namingStatus.done >= namingStatus.total ? (
-              <Text mr={2} fontSize="sm">
+              <Text mr={2} fontSize="sm" textColor="#4ade80">
                 ✓
               </Text>
             ) : (
-              <Spinner size="xs" mr={2} speed="0.8s" />
+              <Spinner size="xs" mr={2} speed="0.8s" color="#facc15" />
             )}
-            <Text fontSize="sm">
+            <Text fontSize="sm" fontWeight="600" textColor="#f8fafc">
               {namingStatus.done >= namingStatus.total
                 ? 'Communities named'
                 : `Naming communities… ${namingStatus.done}/${namingStatus.total}`}
@@ -1525,7 +1528,7 @@ export const Graph = function (props: GraphProps) {
           </Flex>
           {namingStatus.latest && (
             <SlideFade key={namingStatus.latest} in offsetY="8px">
-              <Text fontSize="xs" fontStyle="italic" opacity={0.85}>
+              <Text fontSize="xs" fontStyle="italic" textColor="#7dd3fc">
                 {namingStatus.latest}
               </Text>
             </SlideFade>
