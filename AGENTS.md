@@ -4,8 +4,15 @@
 
 A Next.js 11 / React 17 frontend (plus a small Emacs package, `org-roam-ui.el`) that
 visualizes an org-roam note graph with `react-force-graph`. The Emacs side serves the
-**static export in `out/`** over `simple-httpd` on port **35901** and pushes graph data,
-theme, and commands over a websocket on port **35903** (`ws://localhost:35903`). The
+**static export in `out/`** over a **built-in HTTP server** (`org-roam-ui--server-*` in
+org-roam-ui.el) on port **35901** and pushes graph data, theme, and commands over a
+websocket on port **35903** (`ws://localhost:35903`). The built-in server replaced the
+`simple-httpd` dependency in 2026-07: simple-httpd's 20260623 rewrite strands connections
+under the ~19-request parallel burst of a cold page load (accepted but never serviced —
+reproducible with `xargs -P 19 curl` against any of its versions ≥ the rewrite; 1.5.1 was
+fine), which left the app permanently blank on uncached loads. The built-in server also
+sends `Cache-Control: no-cache` for `index.html` and `immutable` for hashed `_next/static`
+assets, so browsers can't get stuck on a stale app shell. The
 frontend is a static SPA: all data arrives via that websocket, so a dev build served from
 any port still talks to the running Emacs.
 

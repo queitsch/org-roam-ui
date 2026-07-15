@@ -36,7 +36,7 @@ For major new features/bugfixes we will update [changelog](https://github.com/or
 
 `org-roam-ui` is on MELPA!
 
-org-roam-ui requires `org-roam`, `websocket`, `simple-httpd`, `f` and Emacs >= 27 for fast JSON parsing.
+org-roam-ui requires `org-roam`, `websocket` and Emacs >= 27 for fast JSON parsing. (This fork serves the web app with a small built-in HTTP server, so `simple-httpd` is no longer needed.)
 
 ### package.el
 

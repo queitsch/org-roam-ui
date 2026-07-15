@@ -6,7 +6,7 @@
 ;; URL: https://github.com/org-roam/org-roam-ui
 ;; Keywords: files outlines
 ;; Version: 0.1
-;; Package-Requires: ((emacs "27.1") (org-roam "2.0.0") (simple-httpd "20191103.1446") (websocket "1.13"))
+;; Package-Requires: ((emacs "27.1") (org-roam "2.0.0") (websocket "1.13"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -33,7 +33,6 @@
 ;;; Code:
 ;;;; Dependencies
 (require 'json)
-(require 'simple-httpd)
 (require 'org-roam)
 (require 'websocket)
 (require 'org-roam-dailies)
@@ -182,6 +181,143 @@ This is mostly to prevent issues with EXWM and the Webkit browser.")
 (defvar org-roam-ui-ws-server nil
   "The websocket server for org-roam-ui.")
 
+;;;; Web server
+;; A minimal built-in HTTP server. org-roam-ui used to depend on
+;; simple-httpd for this, but its 2026 rewrite strands connections when a
+;; browser fetches many assets in parallel, leaving the app unable to load.
+
+(defvar org-roam-ui--server-process nil
+  "Network server process serving the org-roam-ui frontend.")
+
+(defconst org-roam-ui--server-mime-types
+  '(("html" . "text/html; charset=utf-8")
+    ("js"   . "text/javascript; charset=utf-8")
+    ("css"  . "text/css; charset=utf-8")
+    ("json" . "application/json")
+    ("png"  . "image/png")
+    ("jpg"  . "image/jpeg")
+    ("jpeg" . "image/jpeg")
+    ("gif"  . "image/gif")
+    ("svg"  . "image/svg+xml")
+    ("webp" . "image/webp")
+    ("ico"  . "image/x-icon")
+    ("woff" . "font/woff")
+    ("woff2" . "font/woff2")
+    ("map"  . "application/json")
+    ("txt"  . "text/plain; charset=utf-8"))
+  "MIME types by file extension for the built-in web server.")
+
+(defconst org-roam-ui--server-status-texts
+  '((200 . "OK")
+    (404 . "Not Found")
+    (405 . "Method Not Allowed")
+    (500 . "Internal Server Error"))
+  "HTTP status texts for the built-in web server.")
+
+(defun org-roam-ui--server-start ()
+  "Start the web server serving `org-roam-ui-app-build-dir'."
+  (org-roam-ui--server-stop)
+  (setq org-roam-ui--server-process
+        (make-network-process
+         :name "org-roam-ui-server"
+         :service org-roam-ui-port
+         :server 50
+         :host 'local
+         :family 'ipv4
+         :coding 'binary
+         :filter #'org-roam-ui--server-filter
+         :noquery t)))
+
+(defun org-roam-ui--server-stop ()
+  "Stop the web server."
+  (when (process-live-p org-roam-ui--server-process)
+    (delete-process org-roam-ui--server-process))
+  (setq org-roam-ui--server-process nil))
+
+(defun org-roam-ui--server-filter (proc chunk)
+  "Collect CHUNK from PROC and respond once the request is complete."
+  (let ((data (concat (process-get proc :request-data) chunk)))
+    (process-put proc :request-data data)
+    (when (string-match-p "\r\n\r\n" data)
+      (if (string-match "\\`\\(GET\\|HEAD\\) \\([^ ]+\\) HTTP" data)
+          (progn
+            (process-put proc :head-only (equal (match-string 1 data) "HEAD"))
+            (org-roam-ui--server-handle proc (match-string 2 data)))
+        (org-roam-ui--server-respond proc 405 "text/plain" "method not allowed")))))
+
+(defun org-roam-ui--server-handle (proc target)
+  "Respond to PROC's request for TARGET."
+  (condition-case err
+      (let ((path (car (split-string target "?"))))
+        (cond
+         ;; text of a single node, used by the sidebar
+         ((string-prefix-p "/node/" path)
+          (org-roam-ui--server-respond
+           proc 200 "text/plain; charset=utf-8"
+           (org-roam-ui--get-text
+            (org-link-decode (org-link-decode (substring path (length "/node/")))))))
+         ;; images referenced in notes; the app double-encodes the file path
+         ((string-prefix-p "/img/" path)
+          (org-roam-ui--server-send-file
+           proc
+           (expand-file-name
+            (org-link-decode (org-link-decode (substring path (length "/img/")))))
+           nil))
+         (t (org-roam-ui--server-send-static proc (org-link-decode path)))))
+    (error
+     (org-roam-ui--server-respond
+      proc 500 "text/plain" (format "internal server error: %S" err)))))
+
+(defun org-roam-ui--server-send-static (proc path)
+  "Serve PATH from `org-roam-ui-app-build-dir' to PROC."
+  (let* ((root (file-name-as-directory (expand-file-name org-roam-ui-app-build-dir)))
+         (file (expand-file-name (substring path 1) root))
+         (file (if (file-directory-p file) (expand-file-name "index.html" file) file)))
+    (if (not (string-prefix-p root file))
+        (org-roam-ui--server-respond proc 404 "text/plain" "not found")
+      (org-roam-ui--server-send-file
+       proc file
+       ;; content-hashed assets never change, index.html must stay fresh
+       (if (string-match-p "/_next/static/" file)
+           "public, max-age=31536000, immutable"
+         "no-cache")))))
+
+(defun org-roam-ui--server-send-file (proc file &optional cache-control)
+  "Serve FILE with optional CACHE-CONTROL header to PROC."
+  (if (not (file-regular-p file))
+      (org-roam-ui--server-respond proc 404 "text/plain" "not found")
+    (org-roam-ui--server-respond
+     proc 200
+     (or (cdr (assoc (downcase (or (file-name-extension file) ""))
+                     org-roam-ui--server-mime-types))
+         "application/octet-stream")
+     (with-temp-buffer
+       (set-buffer-multibyte nil)
+       (insert-file-contents-literally file)
+       (buffer-string))
+     cache-control)))
+
+(defun org-roam-ui--server-respond (proc status mime body &optional cache-control)
+  "Send an HTTP response with STATUS, MIME and BODY to PROC.
+The connection is closed afterwards; CACHE-CONTROL, when non-nil, is
+sent as the Cache-Control header."
+  (let ((body (if (multibyte-string-p body)
+                  (encode-coding-string body 'utf-8)
+                body)))
+    (ignore-errors
+      (process-send-string
+       proc
+       (concat (format "HTTP/1.1 %d %s\r\n" status
+                       (alist-get status org-roam-ui--server-status-texts "Error"))
+               (format "Content-Type: %s\r\n" mime)
+               (format "Content-Length: %d\r\n" (length body))
+               (and cache-control (format "Cache-Control: %s\r\n" cache-control))
+               "Access-Control-Allow-Origin: *\r\n"
+               "Connection: close\r\n\r\n")))
+    (unless (process-get proc :head-only)
+      (ignore-errors (process-send-string proc body)))
+    (ignore-errors (delete-process proc))))
+
 ;;;###autoload
 (define-minor-mode
   org-roam-ui-mode
@@ -195,9 +331,7 @@ This serves the web-build and API over HTTP."
    (org-roam-ui-mode
    ;;; check if the default keywords actually exist on `orb-preformat-keywords'
    ;;; else add them
-    (setq-local httpd-port org-roam-ui-port)
-    (setq httpd-root org-roam-ui-app-build-dir)
-    (httpd-start)
+    (org-roam-ui--server-start)
     (setq org-roam-ui-ws-server
           (websocket-server
            35903
@@ -209,7 +343,7 @@ This serves the web-build and API over HTTP."
    (t
     (progn
       (websocket-server-close org-roam-ui-ws-server)
-      (httpd-stop)
+      (org-roam-ui--server-stop)
       (remove-hook 'after-save-hook #'org-roam-ui--on-save)
       (org-roam-ui-follow-mode -1)))))
 
@@ -312,17 +446,6 @@ TODO: Be able to delete individual nodes."
                          (json-encode
                           `((type . "orgText")
                             (data . ,text))))))
-
-(defservlet* node/:id text/plain ()
-  "Servlet for accessing node content."
-  (insert (org-roam-ui--get-text (org-link-decode id)))
-  (httpd-send-header t "text/plain" 200 :Access-Control-Allow-Origin "*"))
-
-(defservlet* img/:file text/plain ()
-  "Servlet for accessing images found in org-roam files."
-  (progn
-    (httpd-send-file t (org-link-decode file))
-    (httpd-send-header t "text/plain" 200 :Access-Control-Allow-Origin "*")))
 
 (defun org-roam-ui--on-save ()
   "Send graphdata on saving an org-roam buffer.
