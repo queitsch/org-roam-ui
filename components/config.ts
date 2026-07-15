@@ -135,6 +135,7 @@ export const initialBehavior = {
   localSame: 'add',
   zoomPadding: 200,
   zoomSpeed: 2000,
+  pinDraggedCommunities: false,
 }
 
 export const initialMouse = {

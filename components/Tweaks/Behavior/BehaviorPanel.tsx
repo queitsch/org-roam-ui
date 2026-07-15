@@ -148,6 +148,18 @@ export const BehaviorPanel = (props: BehaviorPanelProps) => {
           </Portal>
         </Menu>
       </Flex>
+      <Flex alignItems="center" justifyContent="space-between">
+        <Flex>
+          <Text>Pin dragged communities</Text>
+          <InfoTooltip infoText="When dragging a community by its label, keep its nodes where you dropped them instead of letting the simulation pull them back." />
+        </Flex>
+        <Switch
+          isChecked={behavior.pinDraggedCommunities}
+          onChange={() =>
+            setBehavior({ ...behavior, pinDraggedCommunities: !behavior.pinDraggedCommunities })
+          }
+        />
+      </Flex>
       <SliderWithInfo
         label="Zoom speed"
         value={behavior.zoomSpeed}

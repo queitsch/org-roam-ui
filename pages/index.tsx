@@ -1042,6 +1042,11 @@ export const Graph = function (props: GraphProps) {
     null,
   )
   const renderDataRef = useRef<GraphData>({ nodes: [], links: [] })
+  // community whose label is hovered or dragged; its members get highlighted
+  const [hoverCommunity, setHoverCommunity] = useState<number | null>(null)
+  const lastHoverCommunityRef = useRef<number | null>(null)
+  const currentBehaviorRef = useRef(behavior)
+  currentBehaviorRef.current = behavior
 
   const hitTestCommunityLabel = (clientX: number, clientY: number) => {
     const fg = graphRef.current
@@ -1073,16 +1078,19 @@ export const Graph = function (props: GraphProps) {
     event.stopPropagation()
     event.preventDefault()
     communityDragRef.current = { community: hit.box.community, last: hit.pt }
+    setHoverCommunity(hit.box.community)
   }
 
   const handleCommunityHover = (event: React.PointerEvent) => {
     if (communityDragRef.current || threeDim || coloring.method !== 'community') {
       return
     }
+    const hit = hitTestCommunityLabel(event.clientX, event.clientY)
+    setHoverCommunity(hit ? hit.box.community : null)
     // the cursor must go on the canvas itself, force-graph manages its own
     const canvas = (event.currentTarget as HTMLElement).querySelector('canvas')
     if (canvas) {
-      canvas.style.cursor = hitTestCommunityLabel(event.clientX, event.clientY) ? 'grab' : ''
+      canvas.style.cursor = hit ? 'grab' : ''
     }
   }
 
@@ -1112,10 +1120,12 @@ export const Graph = function (props: GraphProps) {
         return
       }
       communityDragRef.current = null
-      communityDragTargets(drag.community).forEach((node) => {
-        node.fx = undefined
-        node.fy = undefined
-      })
+      if (!currentBehaviorRef.current.pinDraggedCommunities) {
+        communityDragTargets(drag.community).forEach((node) => {
+          node.fx = undefined
+          node.fy = undefined
+        })
+      }
       graphRef.current?.d3ReheatSimulation?.()
     }
     window.addEventListener('pointermove', onMove, true)
@@ -1258,7 +1268,19 @@ export const Graph = function (props: GraphProps) {
     },
   )
 
+  const communityMemberIds = (community: number | null) => {
+    if (community === null) {
+      return []
+    }
+    return renderDataRef.current.nodes
+      .filter((node) => clusterRef.current[node.id as string] === community)
+      .map((node) => node.id as string)
+  }
+
   const highlightedNodes = useMemo(() => {
+    if (hoverCommunity !== null) {
+      return Object.fromEntries(communityMemberIds(hoverCommunity).map((id) => [id, {}]))
+    }
     if (!centralHighlightedNode.current) {
       return {}
     }
@@ -1273,7 +1295,7 @@ export const Graph = function (props: GraphProps) {
         ...links.flatMap((link) => [link.source, link.target]),
       ].map((nodeId) => [nodeId, {}]),
     )
-  }, [centralHighlightedNode.current, filteredLinksByNodeIdRef.current])
+  }, [centralHighlightedNode.current, filteredLinksByNodeIdRef.current, hoverCommunity])
 
   useEffect(() => {
     if (sidebarHighlightedNode?.id) {
@@ -1290,10 +1312,17 @@ export const Graph = function (props: GraphProps) {
     if (hoverNode) {
       lastHoverNode.current = hoverNode as OrgRoamNode
     }
-    if (!visuals.highlightAnim) {
-      return hoverNode ? setOpacity(1) : setOpacity(0)
+    if (hoverCommunity !== null) {
+      lastHoverCommunityRef.current = hoverCommunity
+    } else if (hoverNode) {
+      // a node hover supersedes the previous community highlight
+      lastHoverCommunityRef.current = null
     }
-    if (hoverNode) {
+    const highlightActive = !!hoverNode || hoverCommunity !== null
+    if (!visuals.highlightAnim) {
+      return highlightActive ? setOpacity(1) : setOpacity(0)
+    }
+    if (highlightActive) {
       fadeIn()
     } else {
       // to prevent fadeout animation from starting at 1
@@ -1301,7 +1330,7 @@ export const Graph = function (props: GraphProps) {
       cancel()
       opacity > 0.5 ? fadeOut() : setOpacity(0)
     }
-  }, [hoverNode])
+  }, [hoverNode, hoverCommunity])
 
   const highlightColors = useMemo(() => {
     return Object.fromEntries(
@@ -1317,6 +1346,11 @@ export const Graph = function (props: GraphProps) {
   }, [emacsTheme])
 
   const previouslyHighlightedNodes = useMemo(() => {
+    if (lastHoverCommunityRef.current !== null) {
+      return Object.fromEntries(
+        communityMemberIds(lastHoverCommunityRef.current).map((id) => [id, {}]),
+      )
+    }
     const previouslyHighlightedLinks =
       filteredLinksByNodeIdRef.current[lastHoverNode.current?.id!] ?? []
     return Object.fromEntries(
@@ -1325,7 +1359,12 @@ export const Graph = function (props: GraphProps) {
         ...previouslyHighlightedLinks.flatMap((link) => normalizeLinkEnds(link)),
       ].map((nodeId) => [nodeId, {}]),
     )
-  }, [JSON.stringify(hoverNode), lastHoverNode.current, filteredLinksByNodeIdRef.current])
+  }, [
+    JSON.stringify(hoverNode),
+    lastHoverNode.current,
+    filteredLinksByNodeIdRef.current,
+    hoverCommunity,
+  ])
 
   const labelTextColor = useMemo(
     () => getThemeColor(visuals.labelTextColor, theme),
@@ -1407,8 +1446,16 @@ export const Graph = function (props: GraphProps) {
     linkColor: (link) => {
       const sourceId = typeof link.source === 'object' ? link.source.id! : (link.source as string)
       const targetId = typeof link.target === 'object' ? link.target.id! : (link.target as string)
-      const linkIsHighlighted = isLinkRelatedToNode(link, centralHighlightedNode.current)
-      const linkWasHighlighted = isLinkRelatedToNode(link, lastHoverNode.current)
+      const linkInCommunity = (community: number | null) =>
+        community !== null &&
+        clusterRef.current[sourceId as string] === community &&
+        clusterRef.current[targetId as string] === community
+      const linkIsHighlighted =
+        isLinkRelatedToNode(link, centralHighlightedNode.current) ||
+        linkInCommunity(hoverCommunity)
+      const linkWasHighlighted =
+        isLinkRelatedToNode(link, lastHoverNode.current) ||
+        linkInCommunity(lastHoverCommunityRef.current)
       const needsHighlighting = linkIsHighlighted || linkWasHighlighted
       const roamLink = link as OrgRoamLink
 
