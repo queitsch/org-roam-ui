@@ -30,7 +30,7 @@ export const CommunitiesPanel = (props: CommunitiesPanelProps) => {
         <SliderWithInfo
           label="Zone opacity"
           value={coloring.zoneOpacity}
-          min={0.025}
+          min={0}
           max={0.5}
           step={0.025}
           onChange={(value) => setColoringValue('zoneOpacity', value)}

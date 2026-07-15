@@ -78,7 +78,11 @@ export function drawCommunities(props: DrawCommunitiesProps) {
   if (coloring.method !== 'community') {
     return
   }
-  if (layer === 'zones' ? !coloring.communityZones : !coloring.communityLabels) {
+  if (
+    layer === 'zones'
+      ? !coloring.communityZones || coloring.zoneOpacity <= 0
+      : !coloring.communityLabels
+  ) {
     return
   }
 
