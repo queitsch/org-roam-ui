@@ -85,7 +85,9 @@ const nameOneCommunity = async (url: string, model: string, titles: string[]): P
     body: JSON.stringify({
       model,
       temperature: 0.2,
-      max_tokens: 500,
+      // thinking models (qwen3, deepseek-r1, ...) reason before answering;
+      // a small cap makes them hit the limit and return empty content
+      max_tokens: 4096,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         {
@@ -99,7 +101,18 @@ const nameOneCommunity = async (url: string, model: string, titles: string[]): P
     throw new Error(`Chat completion failed: ${res.status}`)
   }
   const completion = await res.json()
-  return cleanName(completion?.choices?.[0]?.message?.content ?? '')
+  const choice = completion?.choices?.[0]
+  const name = cleanName(choice?.message?.content ?? '')
+  if (!name) {
+    console.warn(
+      `Community naming: model ${model} returned no usable name` +
+        ` (finish_reason: ${choice?.finish_reason}). ` +
+        (choice?.finish_reason === 'length'
+          ? 'The model hit the token limit, likely while thinking; consider a non-thinking model.'
+          : ''),
+    )
+  }
+  return name
 }
 
 /**
