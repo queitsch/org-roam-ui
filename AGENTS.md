@@ -91,6 +91,11 @@ llmUrl: 'http://192.168.1.222:11434/v1'
 llmModel: ''                    // '' = auto-pick from GET /models
 ```
 
+The Emacs side can override the endpoint via `org-roam-ui-ollama-path` and
+`org-roam-ui-ollama-model` (defcustoms in `org-roam-ui.el`, sent through the
+`variables` websocket message as `ollamaPath`/`ollamaModel`); when set, they take
+precedence over `llmUrl`/`llmModel`. Documented in README "Community naming (Ollama)".
+
 `communityZones`, `communityLabels`, `zoneOpacity`, and `communityLabelFontSize` are
 user-facing: `components/Tweaks/Visual/CommunitiesPanel.tsx` (a "Communities" accordion
 section in the Visual settings panel, wired up in `VisualsPanel.tsx`).

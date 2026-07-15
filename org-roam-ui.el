@@ -152,6 +152,21 @@ Format as, i.e. with double backslashes for a single backslash:
   :group 'org-roam-ui
   :type 'alist)
 
+(defcustom org-roam-ui-ollama-path nil
+  "URL of an OpenAI-compatible endpoint used to name communities.
+For example an Ollama instance: \"http://localhost:11434/v1\".
+Community names are generated when the graph coloring is set to
+communities.  When nil, the default configured in the web app is used."
+  :group 'org-roam-ui
+  :type '(choice (const :tag "Use the web app default" nil) string))
+
+(defcustom org-roam-ui-ollama-model nil
+  "Model used by `org-roam-ui-ollama-path' to name communities.
+For example \"qwen2.5:7b-instruct-q8_0\".  When nil, the first
+chat-capable model reported by the endpoint is used."
+  :group 'org-roam-ui
+  :type '(choice (const :tag "Auto-pick a model" nil) string))
+
 ;; Internal vars
 
 (defvar org-roam-ui--ws-current-node nil
@@ -601,7 +616,9 @@ from all other links."
                                      ("useInheritance" .
                                       ,use-inheritance)
                                      ("roamDir" . ,org-roam-directory)
-                                     ("katexMacros" . ,org-roam-ui-latex-macros))))))))
+                                     ("katexMacros" . ,org-roam-ui-latex-macros)
+                                     ("ollamaPath" . ,org-roam-ui-ollama-path)
+                                     ("ollamaModel" . ,org-roam-ui-ollama-model))))))))
 
 (defun org-roam-ui-sql-to-alist (column-names rows)
   "Convert sql result to alist for json encoding.

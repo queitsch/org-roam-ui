@@ -196,6 +196,22 @@ You can also provide your own theme if you do not like syncing nor like the defa
 
 You can optionally provide `(base1 . "#XXXXXX")` arguments after the last one to also set the background shades, otherwise ORUI will guess based on the provides bg and fg.
 
+#### Community naming (Ollama)
+
+When the graph coloring is set to "communities" (Visual settings → Graph coloring), ORUI draws a colored background zone behind each community and asks an OpenAI-compatible endpoint (e.g. [Ollama](https://ollama.com)) to give it a short name based on its note titles. Point ORUI at your instance with
+
+```emacs-lisp
+(setq org-roam-ui-ollama-path "http://localhost:11434/v1")
+```
+
+By default the first chat-capable model the endpoint reports is used; to pick a specific one, set
+
+```emacs-lisp
+(setq org-roam-ui-ollama-model "qwen2.5:7b-instruct-q8_0")
+```
+
+Names are cached in the browser's localStorage, so a community is only named once until its notes change. The zones and labels can be toggled (and the label font size adjusted) under Visual settings → Communities.
+
 ### Open on start
 
 By default, org-roam-ui will try to open itself in your default browser. To disable this, set

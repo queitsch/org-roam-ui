@@ -88,6 +88,8 @@ export interface EmacsVariables {
   attachDir?: string
   useInheritance?: boolean
   subDirs: string[]
+  ollamaPath?: string
+  ollamaModel?: string
 }
 export type Tags = string[]
 export type Scope = {
@@ -989,14 +991,22 @@ export const Graph = function (props: GraphProps) {
         ]),
     )
     return nameCommunities({
-      url: coloring.llmUrl,
-      model: coloring.llmModel,
+      // the Emacs variables org-roam-ui-ollama-path/-model take precedence
+      url: variables.ollamaPath || coloring.llmUrl,
+      model: variables.ollamaModel || coloring.llmModel,
       members: namedMembers,
       onName: (community, name) => {
         communityNamesRef.current = { ...communityNamesRef.current, [community]: name }
       },
     })
-  }, [filteredGraphData, coloring.method, coloring.llmUrl, coloring.llmModel])
+  }, [
+    filteredGraphData,
+    coloring.method,
+    coloring.llmUrl,
+    coloring.llmModel,
+    variables.ollamaPath,
+    variables.ollamaModel,
+  ])
 
   const [scopedGraphData, setScopedGraphData] = useState<GraphData>({ nodes: [], links: [] })
 
