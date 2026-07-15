@@ -24,6 +24,7 @@ import { LabelsPanel } from './LabelsPanel'
 import { ThemeSelect } from './ThemeSelect'
 import { CitationsPanel } from '../NodesNLinks/CitationsPanel'
 import { GraphColorSelect } from './GraphColorSelect'
+import { CommunitiesPanel } from './CommunitiesPanel'
 
 export interface VisualsPanelProps {
   visuals: typeof initialVisuals
@@ -91,6 +92,17 @@ export const VisualsPanel = (props: VisualsPanelProps) => {
           </AccordionButton>
           <AccordionPanel>
             <LabelsPanel visuals={visuals} setVisuals={setVisualsCallback} />
+          </AccordionPanel>
+        </AccordionItem>
+        <AccordionItem>
+          <AccordionButton>
+            <Flex justifyContent="space-between" w="100%">
+              <Text>Communities</Text>
+              <AccordionIcon marginRight={2} />
+            </Flex>
+          </AccordionButton>
+          <AccordionPanel>
+            <CommunitiesPanel coloring={coloring} setColoring={setColoring} />
           </AccordionPanel>
         </AccordionItem>
         <AccordionItem>

@@ -128,7 +128,8 @@ export function drawCommunities(props: DrawCommunitiesProps) {
       const [x, y] = centroidOf(core)
       // roughly constant on-screen size, clamped in graph units so labels
       // neither dominate when zoomed out nor vanish when zoomed in
-      const fontSize = Math.min(Math.max(16 / globalScale, 10), 50)
+      const baseSize = coloring.communityLabelFontSize
+      const fontSize = Math.min(Math.max(baseSize / globalScale, baseSize * 0.6), baseSize * 3)
       ctx.font = `bold ${fontSize}px Sans-Serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'

@@ -52,6 +52,7 @@ export const initialColoring = {
   // community zones and labels are only drawn when method === 'community'
   communityZones: true,
   communityLabels: true,
+  communityLabelFontSize: 48,
   // minimum number of nodes a community needs before it gets a zone and a name
   communityMinSize: 3,
   zoneOpacity: 0.075,

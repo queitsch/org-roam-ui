@@ -84,11 +84,16 @@ accepted by Ollama by default.
 method: 'degree' | 'community'  // zones/labels only drawn for 'community'
 communityZones: true
 communityLabels: true
+communityLabelFontSize: 48      // on-screen px target, clamped in graph units
 communityMinSize: 3             // smaller communities get no zone/label/LLM call
 zoneOpacity: 0.075
 llmUrl: 'http://192.168.1.222:11434/v1'
 llmModel: ''                    // '' = auto-pick from GET /models
 ```
+
+`communityZones`, `communityLabels`, `zoneOpacity`, and `communityLabelFontSize` are
+user-facing: `components/Tweaks/Visual/CommunitiesPanel.tsx` (a "Communities" accordion
+section in the Visual settings panel, wired up in `VisualsPanel.tsx`).
 
 ### Limitations / notes
 
