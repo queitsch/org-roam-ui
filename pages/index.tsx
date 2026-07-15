@@ -57,7 +57,7 @@ import { usePersistantState } from '../util/persistant-state'
 import { ThemeContext, ThemeContextProps } from '../util/themecontext'
 import { openNodeInEmacs } from '../util/webSocketFunctions'
 import { drawLabels } from '../components/Graph/drawLabels'
-import { drawCommunities } from '../components/Graph/drawCommunities'
+import { CommunityLabelBox, drawCommunities } from '../components/Graph/drawCommunities'
 import { CommunityMembers, CommunityNames, nameCommunities } from '../util/communityNames'
 import { VariablesContext } from '../util/variablesContext'
 import { findNthNeighbors } from '../util/findNthNeighbour'
@@ -1033,6 +1033,100 @@ export const Graph = function (props: GraphProps) {
     }
   }, [namingStatus])
 
+  // dragging a community label drags the whole community with it:
+  // the labels' hit boxes are recorded while drawing, a pointerdown on one is
+  // intercepted before force-graph pans, and all member nodes get pinned to
+  // the pointer until release
+  const labelBoxesRef = useRef<CommunityLabelBox[]>([])
+  const communityDragRef = useRef<{ community: number; last: { x: number; y: number } } | null>(
+    null,
+  )
+  const renderDataRef = useRef<GraphData>({ nodes: [], links: [] })
+
+  const hitTestCommunityLabel = (clientX: number, clientY: number) => {
+    const fg = graphRef.current
+    if (!fg?.screen2GraphCoords) {
+      return null
+    }
+    const pt = fg.screen2GraphCoords(clientX, clientY)
+    const box = labelBoxesRef.current.find(
+      (b) =>
+        pt.x >= b.x - b.w / 2 && pt.x <= b.x + b.w / 2 && pt.y >= b.y - b.h / 2 && pt.y <= b.y + b.h / 2,
+    )
+    return box ? { box, pt } : null
+  }
+
+  const communityDragTargets = (community: number) =>
+    renderDataRef.current.nodes.filter(
+      (node) => clusterRef.current[node.id as string] === community,
+    )
+
+  const handleCommunityPointerDown = (event: React.PointerEvent) => {
+    if (threeDim || coloring.method !== 'community' || !coloring.communityLabels) {
+      return
+    }
+    const hit = hitTestCommunityLabel(event.clientX, event.clientY)
+    if (!hit) {
+      return
+    }
+    // keep force-graph's pan/zoom and node handlers away from this gesture
+    event.stopPropagation()
+    event.preventDefault()
+    communityDragRef.current = { community: hit.box.community, last: hit.pt }
+  }
+
+  const handleCommunityHover = (event: React.PointerEvent) => {
+    if (communityDragRef.current || threeDim || coloring.method !== 'community') {
+      return
+    }
+    // the cursor must go on the canvas itself, force-graph manages its own
+    const canvas = (event.currentTarget as HTMLElement).querySelector('canvas')
+    if (canvas) {
+      canvas.style.cursor = hitTestCommunityLabel(event.clientX, event.clientY) ? 'grab' : ''
+    }
+  }
+
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      const drag = communityDragRef.current
+      const fg = graphRef.current
+      if (!drag || !fg?.screen2GraphCoords) {
+        return
+      }
+      event.stopPropagation()
+      event.preventDefault()
+      const pt = fg.screen2GraphCoords(event.clientX, event.clientY)
+      const dx = pt.x - drag.last.x
+      const dy = pt.y - drag.last.y
+      drag.last = pt
+      communityDragTargets(drag.community).forEach((node) => {
+        node.x = (node.x ?? 0) + dx
+        node.y = (node.y ?? 0) + dy
+        node.fx = node.x
+        node.fy = node.y
+      })
+    }
+    const onUp = () => {
+      const drag = communityDragRef.current
+      if (!drag) {
+        return
+      }
+      communityDragRef.current = null
+      communityDragTargets(drag.community).forEach((node) => {
+        node.fx = undefined
+        node.fy = undefined
+      })
+      graphRef.current?.d3ReheatSimulation?.()
+    }
+    window.addEventListener('pointermove', onMove, true)
+    window.addEventListener('pointerup', onUp, true)
+    return () => {
+      window.removeEventListener('pointermove', onMove, true)
+      window.removeEventListener('pointerup', onUp, true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const [scopedGraphData, setScopedGraphData] = useState<GraphData>({ nodes: [], links: [] })
 
   useEffect(() => {
@@ -1246,8 +1340,9 @@ export const Graph = function (props: GraphProps) {
   const [dragging, setDragging] = useState(false)
 
   const scaleRef = useRef(1)
+  renderDataRef.current = scope.nodeIds.length ? scopedGraphData : filteredGraphData
   const graphCommonProps: ComponentPropsWithoutRef<typeof TForceGraph2D> = {
-    graphData: scope.nodeIds.length ? scopedGraphData : filteredGraphData,
+    graphData: renderDataRef.current,
     width: windowWidth,
     height: windowHeight,
     backgroundColor: getThemeColor(visuals.backgroundColor, theme),
@@ -1428,7 +1523,12 @@ export const Graph = function (props: GraphProps) {
   }
 
   return (
-    <Box overflow="hidden" onClick={contextMenu.onClose}>
+    <Box
+      overflow="hidden"
+      onClick={contextMenu.onClose}
+      onPointerDownCapture={handleCommunityPointerDown}
+      onPointerMove={handleCommunityHover}
+    >
       {threeDim ? (
         <ForceGraph3D
           ref={graphRef}
@@ -1481,6 +1581,7 @@ export const Graph = function (props: GraphProps) {
               coloring,
               theme,
               layer: 'labels',
+              labelBoxes: labelBoxesRef.current,
             })
           }}
           linkLineDash={(link) => {

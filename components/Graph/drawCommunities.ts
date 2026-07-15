@@ -55,6 +55,16 @@ const trimOutliers = (points: Point[]): Point[] => {
   return kept.length >= 3 ? kept : points
 }
 
+// bounding box of a drawn community label, in graph coordinates;
+// used for hit testing when dragging communities by their label
+export interface CommunityLabelBox {
+  community: number
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface DrawCommunitiesProps {
   ctx: CanvasRenderingContext2D
   globalScale: number
@@ -67,14 +77,29 @@ export interface DrawCommunitiesProps {
   // 'zones' is meant for onRenderFramePre (behind nodes and links),
   // 'labels' for onRenderFramePost (on top of them)
   layer: 'zones' | 'labels'
+  // when given, filled with the drawn labels' hit boxes each frame
+  labelBoxes?: CommunityLabelBox[]
 }
 
 // Draws a soft convex-hull "zone" behind each community and the community's
 // name at the zone's centroid.
 export function drawCommunities(props: DrawCommunitiesProps) {
-  const { ctx, globalScale, nodes, cluster, communityNames, visuals, coloring, theme, layer } =
-    props
+  const {
+    ctx,
+    globalScale,
+    nodes,
+    cluster,
+    communityNames,
+    visuals,
+    coloring,
+    theme,
+    layer,
+    labelBoxes,
+  } = props
 
+  if (labelBoxes && layer === 'labels') {
+    labelBoxes.length = 0
+  }
   if (coloring.method !== 'community') {
     return
   }
@@ -144,6 +169,13 @@ export function drawCommunities(props: DrawCommunitiesProps) {
       ctx.strokeText(name, x, y)
       ctx.fillStyle = hexToRGBA(communityColor, 0.9)
       ctx.fillText(name, x, y)
+      labelBoxes?.push({
+        community,
+        x,
+        y,
+        w: ctx.measureText(name).width + fontSize * 0.6,
+        h: fontSize * 1.5,
+      })
     }
   })
   ctx.restore()
