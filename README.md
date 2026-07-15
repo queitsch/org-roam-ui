@@ -55,8 +55,8 @@ Add to your init:
     org-roam-ui-follow t
     org-roam-ui-update-on-save t
     org-roam-ui-open-on-start t
-    org-roam-ui-ollama-path "http://192.168.1.222:11434/v1"
-    org-roam-ui-ollama-model "qwen3.6:35b-mlx" ;; nil picks the first chat model
+    org-roam-ui-ollama-path "http://localhost:11434/v1"
+    org-roam-ui-ollama-model nil ;; nil picks the first chat model
   ))		  
 
 ```
