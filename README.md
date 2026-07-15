@@ -1,3 +1,5 @@
+# This is a fork with node community highlighting and naming (through Ollama). Original at https://github.com/org-roam/org-roam-ui - thanks [tefkah](https://github.com/tefkah)!
+
 [![ci](https://github.com/org-roam/org-roam-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/org-roam/org-roam-ui/actions/workflows/ci.yml) [![MELPA](https://melpa.org/packages/org-roam-ui-badge.svg)](https://melpa.org/#/org-roam-ui)
 <img width="1440" alt="The org-roam-ui graph with communities colored, labeled, and given background zones" src="screenshot-with-community-labels.png">
 
