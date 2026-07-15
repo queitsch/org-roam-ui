@@ -1,6 +1,7 @@
-# This is a fork with node community highlighting and naming (through Ollama). Original at https://github.com/org-roam/org-roam-ui - thanks [tefkah](https://github.com/tefkah)!
+# This is a fork with node community highlighting and naming (through Ollama). Forked from https://github.com/org-roam/org-roam-ui - thanks [tefkah](https://github.com/tefkah)!
 
-[![ci](https://github.com/org-roam/org-roam-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/org-roam/org-roam-ui/actions/workflows/ci.yml) [![MELPA](https://melpa.org/packages/org-roam-ui-badge.svg)](https://melpa.org/#/org-roam-ui)
+All code in the fork by Claude. 
+
 <img width="1440" alt="The org-roam-ui graph with communities colored, labeled, and given background zones" src="screenshot-with-community-labels.png">
 
 # org-roam-ui: a graphical frontend for your org-roam Zettelkasten
@@ -34,69 +35,36 @@ For major new features/bugfixes we will update [changelog](https://github.com/or
 
 ## Installation
 
-`org-roam-ui` is on MELPA!
+### use-package
 
-org-roam-ui requires `org-roam`, `websocket` and Emacs >= 27 for fast JSON parsing. (This fork serves the web app with a small built-in HTTP server, so `simple-httpd` is no longer needed.)
+To switch from Melpa:
 
-### package.el
-
-```
-M-x package-install org-roam-ui
+``` emacs-lisp
+M-x package-delete RET org-roam-ui-20221105.1040 RET
 ```
 
-No configuration is necessary when you use `package.el` to install ORUI.
-
-### Doom
-
-Add the following to your `package.el`
-
-Org-roam-ui tries to keep up with the latest features of `org-roam`, which conflicts with Doom Emacs's desire for
-stability. To make sure nothing breaks, use the latest version of `org-roam` by unpinning it.
+Add to your init:
 
 ```emacs-lisp
-(unpin! org-roam)
-(package! org-roam-ui)
-```
-
-Then something along the following to your `config.el`
-
-```emacs-lisp
-(use-package! websocket
-    :after org-roam)
-
-(use-package! org-roam-ui
-    :after org-roam ;; or :after org
-;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
-;;         a hookable mode anymore, you're advised to pick something yourself
-;;         if you don't care about startup time, use
-;;  :hook (after-init . org-roam-ui-mode)
-    :config
-    (setq org-roam-ui-sync-theme t
-          org-roam-ui-follow t
-          org-roam-ui-update-on-save t
-          org-roam-ui-open-on-start t))
-
-```
-
-We recommend only loading org-roam-ui after loading org(-roam) as starting the server and making database requests can impact startup times quite a lot.
-
-### straight/use-package
-
-```emacs-lisp
+(use-package websocket)
 (use-package org-roam-ui
-  :straight
-    (:host github :repo "org-roam/org-roam-ui" :branch "main" :files ("*.el" "out"))
-    :after org-roam
-;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
-;;         a hookable mode anymore, you're advised to pick something yourself
-;;         if you don't care about startup time, use
-;;  :hook (after-init . org-roam-ui-mode)
-    :config
-    (setq org-roam-ui-sync-theme t
-          org-roam-ui-follow t
-          org-roam-ui-update-on-save t
-          org-roam-ui-open-on-start t))
+  :vc (:url "https://github.com/queitsch/org-roam-ui" :branch "main" :rev :newest)
+  :hook (after-init . org-roam-ui-mode)
+  :config
+  (setq org-roam-ui-sync-theme t
+    org-roam-ui-follow t
+    org-roam-ui-update-on-save t
+    org-roam-ui-open-on-start t
+    org-roam-ui-ollama-path "http://192.168.1.222:11434/v1"
+    org-roam-ui-ollama-model "qwen3.6:35b-mlx" ;; nil picks the first chat model
+  ))		  
 
+```
+
+## Update
+
+``` emacs-lisp
+M-x package-vc-upgrade RET org-roam-ui RET
 ```
 
 ## Usage
@@ -233,6 +201,8 @@ By default, org-roam-ui will try to open itself in your default browser. To disa
 ## FAQ 🗨
 
 ### Q: Aaaaand it broke: what do?
+
+(Note: This is a fork. Please re-test bugs with upstream at https://github.com/org-roam/org-roam-ui , if they persist, report there.)
 
 Sorry! This is still alpha software, so expect it to break from time to time. Best thing you can try is to remove your settings by going to "Storage > Local Storage" on Firefox or "Application > Local Storage" on Chromium and deleting everything there.
 
